@@ -1,0 +1,53 @@
+{
+  "Campaign": "20261029_001624_932",
+  "Snapshots": [
+    {
+      "Name": "corollary18",
+      "Source": "results/corollary18.mat",
+      "SHA256": "a451bf431306f4bb6346e1b8f79923601a42171d234ed4deef4ec9ca248b46c3",
+      "Nx": 1200,
+      "Nt": 3200000,
+      "T": 1.0
+    },
+    {
+      "Name": "corollary19",
+      "Source": "results/corollary19.mat",
+      "SHA256": "bac1ed77ea095e76f0fcfc54aec3cc34574618e8928f6131af23970da1a5f856",
+      "Nx": 1200,
+      "Nt": 400000,
+      "T": 0.13
+    },
+    {
+      "Name": "proposition20",
+      "Source": "results/proposition20.mat",
+      "SHA256": "9f136fb5866a8d779309fd6facf00ef89f7e7bff481eda38015f8b6d8eb2ff77",
+      "Nx": 1200,
+      "Nt": 3200000,
+      "T": 1.0
+    },
+    {
+      "Name": "proposition22",
+      "Source": "results/proposition22.mat",
+      "SHA256": "3a6f13a5ce841bc95505969893c4c5310a5e1ed33b0d445fd570fbb2f8e713cb",
+      "Nx": 500,
+      "Nt": 25000,
+      "T": 0.32
+    },
+    {
+      "Name": "proposition24",
+      "Source": "results/proposition24.mat",
+      "SHA256": "c058de50bd2d327e6fdc5bb2e3bb7cf5b84ad832fdd3ad500d950ba9ff60f474",
+      "Nx": 1000,
+      "Nt": 80000,
+      "T": 1.0
+    },
+    {
+      "Name": "proposition20_unregularized",
+      "Source": "data/witnesses/proposition20_unregularized.mat",
+      "SHA256": "8271fe04b0847a6ebe7f071a9a564eaf68054c96b632a82bf5b2413778f0898f",
+      "Nx": 100,
+      "Nt": 2000,
+      "T": 1.0
+    }
+  ]
+}

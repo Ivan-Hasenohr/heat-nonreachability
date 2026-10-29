@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the companion article below."
+type: software
+title: "MATLAB/INTLAB code for computer-assisted non-reachability proofs"
+authors:
+  - family-names: Hasenohr
+    given-names: Ivan
+preferred-citation:
+  type: article
+  title: "Computer-assisted proofs of non-reachability for linear parabolic PDEs under bounded control constraints"
+  authors:
+    - family-names: Hasenohr
+      given-names: Ivan
+    - family-names: Pouchol
+      given-names: Camille
+    - family-names: Privat
+      given-names: Yannick
+    - family-names: Zhang
+      given-names: Christophe
+  url: "https://hal.science/hal-05357694"

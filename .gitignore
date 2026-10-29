@@ -1,0 +1,22 @@
+# Numerical outputs and frozen campaign copies are distributed separately.
+/results/
+
+
+# MATLAB autosaves and local sessions.
+*.asv
+*.m~
+*~
+/matlab.mat
+/diary
+*.log
+
+# Python caches and local environments.
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Operating-system metadata.
+Thumbs.db
+.DS_Store
+desktop.ini

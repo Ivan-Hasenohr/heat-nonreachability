@@ -1,0 +1,66 @@
+function certified = check_campaign_result(result_file,is_table)
+% Check a saved result's format and certification decision.
+% This function reads results; it does not repeat the CAP computation.
+assert(isfile(result_file),'The script did not save its expected result.');
+
+if is_table
+    certified = check_table(result_file);
+else
+    certified = check_certificate(result_file);
+end
+end
+
+function certified = check_certificate(result_file)
+% The saved flag must agree with a finite, strictly negative upper bound.
+required = {'p','args','certified','J','bounds','certification_seconds'};
+saved = load(result_file,required{:});
+assert(all(isfield(saved,required)),'The result format is incomplete.');
+assert(isa(saved.J,'intval') && isequal(size(saved.J),[1,1]), ...
+    'J must be a scalar interval.');
+
+required_bounds = {'time','space','discretization','roundoff', ...
+    'discrete_enclosure','final_enclosure'};
+assert(isstruct(saved.bounds) && all(isfield(saved.bounds,required_bounds)), ...
+    'The saved error budget is incomplete.');
+for field = {'time','space','discretization','roundoff'}
+    validateattributes(saved.bounds.(field{1}),{'double'}, ...
+        {'real','finite','scalar','nonnegative'});
+end
+validateattributes(saved.certification_seconds,{'double'}, ...
+    {'real','finite','scalar','nonnegative'});
+
+assert(isa(saved.bounds.final_enclosure,'intval') ...
+    && isequal(inf(saved.J),inf(saved.bounds.final_enclosure)) ...
+    && isequal(sup(saved.J),sup(saved.bounds.final_enclosure)), ...
+    'J and bounds.final_enclosure disagree.');
+assert(islogical(saved.certified) && isscalar(saved.certified), ...
+    'The certification flag must be a scalar logical.');
+
+certified = isfinite(inf(saved.J)) && isfinite(sup(saved.J)) && sup(saved.J)<0;
+assert(saved.certified == certified,'The certification flag disagrees with J.');
+end
+
+function certified = check_table(result_file)
+% Every saved amplitude must have a finite, strictly negative upper bound.
+required = {'J_all','sups_all','lambda_cert_all','Nx_list','Nt_list','n_modes'};
+saved = load(result_file,required{:});
+assert(all(isfield(saved,required)),'The table format is incomplete.');
+
+expected_size = [length(saved.Nx_list),saved.n_modes];
+assert(length(saved.Nx_list) == length(saved.Nt_list), ...
+    'The spatial and temporal mesh lists have different lengths.');
+assert(isa(saved.J_all,'intval') && isa(saved.lambda_cert_all,'intval') ...
+    && isequal(size(saved.J_all),expected_size) ...
+    && isequal(size(saved.lambda_cert_all),expected_size) ...
+    && isequal(size(saved.sups_all),expected_size), ...
+    'The table dimensions are inconsistent.');
+assert(isequal(saved.sups_all,sup(saved.J_all)), ...
+    'The table upper bounds disagree with its saved intervals.');
+
+certified = all(isfinite(inf(saved.J_all)),'all') ...
+    && all(isfinite(sup(saved.J_all)),'all') ...
+    && all(sup(saved.J_all)<0,'all') ...
+    && all(isfinite(inf(saved.lambda_cert_all)),'all') ...
+    && all(isfinite(sup(saved.lambda_cert_all)),'all') ...
+    && all(inf(saved.lambda_cert_all)>0,'all');
+end
