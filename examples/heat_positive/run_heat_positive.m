@@ -1,4 +1,4 @@
-% Corollary 18: search for a dual witness on a coarse mesh.
+% Corollary 20: search for a dual witness on a coarse mesh.
 
 project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(genpath(fullfile(project_root, 'src')));
@@ -25,7 +25,11 @@ u_0 = zeros(Nx-1,Nt);
 [J, p, u] = find_and_certify_heat(y_f, y_f_base, p_0, u_0, args, args_float);
 
 % Preserve the witness even if coarse certification is inconclusive.
-save(fullfile(project_root, 'data', 'witnesses','corollary18_coarse.mat'), 'p', 'Nx', 'Nt', 'y_f_base', 'J');
+output_dir = fullfile(project_root,'results','search');
+if ~isfolder(output_dir)
+    mkdir(output_dir);
+end
+save(fullfile(output_dir,'heat_positive.mat'), 'p', 'Nx', 'Nt', 'y_f_base', 'J');
 
 disp('Coarse certification enclosure:');
 disp(J);

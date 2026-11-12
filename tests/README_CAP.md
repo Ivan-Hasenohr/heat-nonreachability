@@ -4,7 +4,7 @@ These tests exercise numerical kernels, error budgets, certificate decisions and
 
 ## Run
 
-MATLAB R2023b and INTLAB 12 are the tested versions. MATLAB's built-in `matlab.unittest` framework is used; no additional testing toolbox, Python, external fixture file, or audit workspace is required.
+MATLAB R2023b and INTLAB 12 are the tested versions. MATLAB's built-in `matlab.unittest` framework is used; no additional testing toolbox, Python, or audit workspace is required. The projected-target tests also check the five fixed witness inputs.
 
 Start your own INTLAB installation, then run:
 
@@ -32,6 +32,7 @@ Each file groups one part of the proof computation. Each local `test...` functio
 | `test_cap_error_bounds.m` | Constants C3, control measure, actual box amplitude, target projection error, transposed reaction, separate regularity denominators and optional diagnostics. Polynomial witnesses allow explicit norms of A* p. |
 | `test_cap_certificates.m` | P1/spline/sine targets, both coupled target types, continuous product norm for ball radii, nonzero initial states, uncertainty inflation, decisions and metadata save/load. Initial propagation is recomputed from the weak FE system. |
 | `test_cap_input_contracts.m` | Floating/verified separation, step consistency, matrix size, malformed witnesses/states, exact scalar zero initial state, explicit ball radius and optional floating tables. |
+| `test_cap_projected_targets.m` | Projected endpoint coefficients checked against independent interval Taylor integration; zero input, region additivity and consistency of current witness inputs. |
 
 The four small helpers in `private/` only compare references, check expected rejections and construct explicit polynomial/spline fixtures. They do not call a production certifier to decide the expected sign.
 
@@ -81,6 +82,6 @@ This checks the direction of the reaction transpose independently of the impleme
 - Synthetic A=0, A=-I and nilpotent fixtures isolate kernel properties. They do not claim to be heat-equation proof configurations.
 - The self-adjoint branch test also checks its explicit diagnostic label; changing that label requires updating this test.
 
-This readable subset complements the broader audit suite. It does not include the full L2-table script/checkpoint harness, exhaustive geometry tests or workflow/memory-guard checks from that audit. It does not prove the correctness of arbitrary MATLAB code or replace the mathematical estimates, INTLAB's guarantees and the final six certificate runs plus full L2 table.
+This readable subset complements the broader audit suite. It does not include the full L2-table script/checkpoint harness, exhaustive geometry tests or workflow/memory-guard checks from that audit. It does not prove the correctness of arbitrary MATLAB code or replace the mathematical estimates, INTLAB's guarantees and the final seven certificate runs plus full L2 table.
 
 Before release, run this suite on the frozen sources, then reproduce the paper's results using their documented certificate scripts. Changing control parameters intentionally may require adapting tests that exercise the example initializers' current defaults.

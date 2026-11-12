@@ -15,12 +15,13 @@ project_root = fileparts(fileparts(mfilename('fullpath')));
 
 % Each row contains: case name, script in examples/, output in results/.
 cases = {
-    'theorem6',      'heat_positive/run_heat_intro_certificate.m',    'theorem6.mat';
-    'corollary18',   'heat_positive/run_heat_positive_certificate.m', 'corollary18.mat';
-    'corollary19',   'heat_min_time/run_heat_min_time_certificate.m', 'corollary19.mat';
-    'proposition20', 'heat_tent/run_heat_tent_certificate.m',         'proposition20.mat';
-    'proposition22', 'coupled_ball/run_coupled_ball_certificate.m',   'proposition22.mat';
-    'proposition24', 'coupled_partial/run_coupled_partial.m',         'proposition24.mat';
+    'heat_intro',      'heat_positive/run_heat_intro_certificate.m',    'heat_intro.mat';
+    'heat_positive',   'heat_positive/run_heat_positive_certificate.m', 'heat_positive.mat';
+    'heat_min_time',   'heat_min_time/run_heat_min_time_certificate.m', 'heat_min_time.mat';
+    'heat_projected', 'heat_projected_target/run_heat_projected_target_certificate.m', 'heat_projected.mat';
+    'coupled_ball', 'coupled_projected/run_coupled_projected_ball.m',    'coupled_projected/ball/fine.mat';
+    'coupled_partial', 'coupled_projected/run_coupled_projected_partial.m', 'coupled_projected/partial/fine.mat';
+    'coupled_split', 'coupled_projected/run_coupled_projected_split.m',   'coupled_projected/split/fine.mat';
     'table_l2',      'table_l2/compute_heat_l2_table.m',               'table_l2/table_L2_all.mat'
 };
 
@@ -33,6 +34,12 @@ n_cases = size(cases,1);
 assert(isfolder(fullfile(project_root,'src')),'The src directory is missing.');
 assert(isfolder(fullfile(project_root,'data','witnesses')), ...
     'The witness directory is missing.');
+witness_files = {'heat_intro_seed.mat','heat_positive_coarse.mat', ...
+    'heat_min_time_coarse.mat','heat_projected_sine.mat','coupled_split_sine.csv'};
+for i = 1:length(witness_files)
+    assert(isfile(fullfile(project_root,'data','witnesses',witness_files{i})), ...
+        'Missing fixed witness: %s',witness_files{i});
+end
 for i = 1:n_cases
     assert(isfile(fullfile(project_root,'examples',cases{i,2})), ...
         'Missing campaign script: %s',cases{i,2});

@@ -12,9 +12,22 @@ end
 
 function certified = check_certificate(result_file)
 % The saved flag must agree with a finite, strictly negative upper bound.
-required = {'p','args','certified','J','bounds','certification_seconds'};
-saved = load(result_file,required{:});
-assert(all(isfield(saved,required)),'The result format is incomplete.');
+required = {'p','certified','J','bounds'};
+metadata = whos('-file',result_file);
+fields = {metadata.name};
+if ~ismember('args',fields)
+    required = [required,{'Nx','Nt','T','kappa','reaction','form_bounds', ...
+        'control_intervals','control_bounds','y_0_base','y_f_base', ...
+        'target_kind','target_radius'}];
+end
+if ismember('certification_seconds',fields)
+    runtime_field = 'certification_seconds';
+else
+    runtime_field = 'seconds';
+end
+required{end+1} = runtime_field;
+assert(all(ismember(required,fields)),'The result format is incomplete.');
+saved = load(result_file,'certified','J','bounds',runtime_field);
 assert(isa(saved.J,'intval') && isequal(size(saved.J),[1,1]), ...
     'J must be a scalar interval.');
 
@@ -26,7 +39,7 @@ for field = {'time','space','discretization','roundoff'}
     validateattributes(saved.bounds.(field{1}),{'double'}, ...
         {'real','finite','scalar','nonnegative'});
 end
-validateattributes(saved.certification_seconds,{'double'}, ...
+validateattributes(saved.(runtime_field),{'double'}, ...
     {'real','finite','scalar','nonnegative'});
 
 assert(isa(saved.bounds.final_enclosure,'intval') ...

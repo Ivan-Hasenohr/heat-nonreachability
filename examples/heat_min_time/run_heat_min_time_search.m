@@ -1,5 +1,5 @@
-% Corollary 19: search for a witness at T = 0.13.
-% Start from the coarse witness obtained for Corollary 18.
+% Corollary 21: search for a witness at T = 0.13.
+% Start from the coarse witness obtained for Corollary 20.
 
 project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(genpath(fullfile(project_root, 'src')));
@@ -26,9 +26,9 @@ y_f = mid(y_f_base)*sin(pi*x);
 
 %% Initialize the search
 
-% Reuse the coarse witness from Corollary 18.
+% Reuse the coarse witness from Corollary 20.
 previous = load(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary18_coarse.mat'));
+    'heat_positive_coarse.mat'));
 
 assert(length(previous.p) == Nx-1, ...
     'The initial witness must match the search mesh.');
@@ -45,8 +45,11 @@ u_0 = zeros(Nx-1,Nt);
 
 %% Save the witness independently of certification success
 
-save(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary19_coarse.mat'), ...
+output_dir = fullfile(project_root,'results','search');
+if ~isfolder(output_dir)
+    mkdir(output_dir);
+end
+save(fullfile(output_dir,'heat_min_time.mat'), ...
     'p', 'Nx', 'Nt', 'y_f_base', 'J', 'args');
 
 %% Display diagnostics

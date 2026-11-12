@@ -1,4 +1,4 @@
-% Corollary 18: certify a previously saved witness on a fine mesh.
+% Corollary 20: certify a previously saved witness on a fine mesh.
 
 project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(genpath(fullfile(project_root, 'src')));
@@ -10,7 +10,7 @@ end
 
 % Load the witness obtained with both control intervals.
 coarse = load(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary18_coarse.mat'));
+    'heat_positive_coarse.mat'));
 
 args = init_heat_fem(1200,3200000,intval('1'),false);
 
@@ -34,9 +34,6 @@ assert(length(y_f_base) ~= Nx-1 ...
 
 y_0 = zeros(Nx-1,1);
 
-% Save the fine witness before the potentially long certification.
-save(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary18_fine.mat'), 'p', 'Nx', 'y_f_base');
 
 started = tic;
 
@@ -46,9 +43,17 @@ started = tic;
 
 certification_seconds = toc(started);
 
-save(fullfile(project_root, 'results', 'corollary18.mat'), ...
+T = args{1};
+Nt = args{2};
+Nx = args{11};
+kappa = args{12};
+control_intervals = args{13};
+control_bounds = [intval(0),args{9}];
+
+save(fullfile(project_root, 'results', 'heat_positive.mat'), ...
     'p', 'y_0', 'y_f_base', 'args', ...
-    'certified', 'J', 'support', 'pairing', 'err', 'bounds', "certification_seconds");
+    'certified', 'J', 'support', 'pairing', 'err', 'bounds', "certification_seconds", ...
+    'T','Nt','Nx','kappa','control_intervals','control_bounds');
 
 disp('Final certification enclosure:');
 disp(J);

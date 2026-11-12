@@ -1,4 +1,4 @@
-% Corollary 19: certify the witness optimized specifically for T = 0.13.
+% Corollary 21: certify the witness optimized specifically for T = 0.13.
 
 project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(genpath(fullfile(project_root, 'src')));
@@ -15,7 +15,7 @@ Nx = args{11};
 %% Transfer the newly optimized coarse witness
 
 coarse = load(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary19_coarse.mat'));
+    'heat_min_time_coarse.mat'));
 
 p = resample_nodal_witness(coarse.p, Nx);
 
@@ -34,9 +34,6 @@ assert(length(y_f_base) ~= Nx-1 ...
 
 y_0 = zeros(Nx-1,1);
 
-% Preserve the fine witness before certification.
-save(fullfile(project_root, 'data', 'witnesses', ...
-    'corollary19_fine.mat'), 'p', 'Nx', 'y_f_base');
 
 %% Certify and save the result
 
@@ -47,9 +44,17 @@ started = tic;
 
 certification_seconds = toc(started);
 
-save(fullfile(project_root, 'results', 'corollary19.mat'), ...
+T = args{1};
+Nt = args{2};
+Nx = args{11};
+kappa = args{12};
+control_intervals = args{13};
+control_bounds = [intval(0),args{9}];
+
+save(fullfile(project_root, 'results', 'heat_min_time.mat'), ...
     'p', 'y_0', 'y_f_base', 'args', ...
-    'certified', 'J', 'support', 'pairing', 'err', 'bounds', 'certification_seconds');
+    'certified', 'J', 'support', 'pairing', 'err', 'bounds', 'certification_seconds', ...
+    'T','Nt','Nx','kappa','control_intervals','control_bounds');
 
 disp('Certified non-reachability:');
 disp(certified);

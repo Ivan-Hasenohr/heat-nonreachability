@@ -17,7 +17,7 @@ preparation_started = tic;
 
 %% Transfer the saved witness to the chosen spatial mesh
 
-source_witness = fullfile('data','witnesses','corollary18_fine.mat');
+source_witness = fullfile('data','witnesses','heat_intro_seed.mat');
 witness = load(fullfile(project_root,source_witness),'p','Nx');
 
 assert(iscolumn(witness.p) && length(witness.p) == witness.Nx-1, ...
@@ -82,10 +82,18 @@ if ~isfolder(output_dir)
     mkdir(output_dir);
 end
 
-save(fullfile(output_dir,'theorem6.mat'), ...
-    'p','Nx','Nt','y_0','y_f_base','args','source_witness','source_Nx', ...
+T = args{1};
+Nt = args{2};
+Nx = args{11};
+kappa = args{12};
+control_intervals = args{13};
+control_bounds = [intval(0),args{9}];
+
+save(fullfile(output_dir,'heat_intro.mat'), ...
+    'p','y_0','y_f_base','args','source_witness','source_Nx', ...
     'certified','J','support','pairing','err','discretization_bound', ...
-    'preparation_seconds','certification_seconds', 'bounds');
+    'preparation_seconds','certification_seconds', 'bounds', ...
+    'T','Nt','Nx','kappa','control_intervals','control_bounds');
 
 disp('Certified non-reachability:');
 disp(certified);

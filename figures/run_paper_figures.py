@@ -1,10 +1,4 @@
-"""Recreate the paper figures in Python, using the original notebook's style.
-
-Run: python run_paper_figures.py
-Refresh from MATLAB results: python run_paper_figures.py --project PATH
-The bundled NPZ snapshots make subsequent runs independent of MATLAB/INTLAB.
-All calculations here are floating illustrations, never CAP verification.
-"""
+"""Generate the seven paper figures from one completed certification campaign."""
 
 from __future__ import annotations
 
@@ -25,9 +19,8 @@ from scipy.linalg import expm
 
 
 HERE = Path(__file__).resolve().parent
-CASE_NAMES = ('corollary18', 'corollary19', 'proposition20', 'proposition22', 'proposition24')
 
-# The visual choices follow Figures 1-3 and cells 6, 14 and 18 of the notebook.
+# Shared style for the seven figures in the article.
 STYLE = {
     'font.family': 'DejaVu Sans', 'font.size': 12,
     'mathtext.fontset': 'dejavusans', 'axes.linewidth': 0.8,
@@ -61,6 +54,8 @@ class Case:
     certified: bool
     source: str
     source_sha256: str
+    target_kind: int = 2
+    target_radius: float = 0.0
 
     @property
     def components(self):
@@ -91,55 +86,6 @@ def interval_bounds(value):
 def midpoint(value):
     lower, upper = interval_bounds(value)
     return (lower + upper) / 2
-
-
-def read_case(project, name):
-    raw = name == 'proposition20_unregularized'
-    path = project / ('data/witnesses' if raw else 'results') / f'{name}.mat'
-    names = ['p', 'args', 'y_0', 'y_0_base', 'y_f_base', 'certified',
-             'certification_performed', 'lambda_reg']
-    saved = loadmat(path, variable_names=names)
-    args = saved['args'].ravel()
-    p = midpoint(saved['p']).ravel()
-    nx = int(midpoint(args[10]).item())
-    components = p.size // (nx - 1)
-    assert components in (1, 2) and p.size == components * (nx - 1)
-    omega_index = 12 if components == 1 else 14
-    lower, upper = interval_bounds(args[omega_index])
-    intervals = np.column_stack((lower.ravel(), upper.ravel()))
-    if raw:
-        assert not saved['certification_performed'].item()
-        assert saved['lambda_reg'].item() == 0
-    else:
-        assert saved['certified'].item(), f'{name} is not a saved certified result.'
-    initial = saved.get('y_0_base', saved.get('y_0', np.zeros((components, 1))))
-    return Case(
-        name=name, p=p, nx=nx, nt=int(midpoint(args[1]).item()),
-        time=float(midpoint(args[0]).item()), kappa=midpoint(args[11]).ravel(),
-        coupling=midpoint(args[12]) if components == 2 else np.zeros((1, 1)),
-        intervals=intervals,
-        control_bounds=midpoint(args[13]).ravel() if components == 2
-        else np.array([0., midpoint(args[8]).item()]),
-        initial=midpoint(initial).ravel(), target=midpoint(saved['y_f_base']).ravel(),
-        certified=not raw, source=path.relative_to(project).as_posix(), source_sha256=sha256(path),
-    )
-
-
-def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def save_snapshot(case, folder):
-    folder.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(folder / f'{case.name}.npz', **case.__dict__)
-
-
-def read_snapshot(folder, name):
-    with np.load(folder / f'{name}.npz', allow_pickle=False) as data:
-        values = {key: data[key] for key in data.files}
-    for key in ('name', 'nx', 'nt', 'time', 'certified', 'source', 'source_sha256'):
-        values[key] = values[key].item()
-    return Case(**values)
 
 
 def state_values(base, nx, components, x):
@@ -219,186 +165,174 @@ def paper_axes(ax, limits, y_step):
     ax.tick_params(direction='out', length=3.5, width=.8)
 
 
-def scalar_figure(case, x, *, raw=None):
-    """Figures 1 and 2: same short labels, colors and legend placement."""
+# Stable physical names, ordered as Figures 1 to 7 in the manuscript.
+RESULT_FILES = {
+    'heat_intro': 'heat_intro.mat',
+    'heat_positive': 'heat_positive.mat',
+    'heat_min_time': 'heat_min_time.mat',
+    'heat_projected': 'heat_projected.mat',
+    'coupled_ball': 'coupled_projected/ball/fine.mat',
+    'coupled_partial': 'coupled_projected/partial/fine.mat',
+    'coupled_split': 'coupled_projected/split/fine.mat',
+}
+
+
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def read_case(project, name):
+    path = project / 'results' / RESULT_FILES[name]
+    variables = ['p', 'Nx', 'Nt', 'T', 'kappa', 'reaction', 'control_intervals',
+                 'control_bounds', 'y_0', 'y_0_base', 'y_f_base', 'target_kind',
+                 'target_radius', 'certified', 'J']
+    saved = loadmat(path, variable_names=variables)
+    lower_j, upper_j = interval_bounds(saved['J'])
+    if not saved['certified'].item() or not (
+            np.isfinite(lower_j.item()) and np.isfinite(upper_j.item()) and upper_j.item() < 0):
+        raise ValueError(f'{path} does not contain a finite negative certificate.')
+    nx = int(saved['Nx'].item())
+    p = saved['p'].ravel()
+    components = p.size // (nx - 1)
+    if components not in (1, 2) or p.size != components * (nx - 1):
+        raise ValueError(f'{path} has inconsistent witness dimensions.')
+    left, right = interval_bounds(saved['control_intervals'])
+    initial = saved.get('y_0_base', saved.get('y_0', np.zeros((components, 1))))
+    return Case(
+        name=name, p=p, nx=nx, nt=int(saved['Nt'].item()), time=midpoint(saved['T']).item(),
+        kappa=midpoint(saved['kappa']).ravel(),
+        coupling=midpoint(saved.get('reaction', np.zeros((1, 1)))),
+        intervals=np.column_stack((left.ravel(), right.ravel())),
+        control_bounds=midpoint(saved['control_bounds']).ravel(),
+        initial=midpoint(initial).ravel(), target=midpoint(saved['y_f_base']).ravel(),
+        certified=True, source=path.relative_to(project).as_posix(), source_sha256=sha256(path),
+        target_kind=int(saved.get('target_kind', np.array([[2]])).item()),
+        target_radius=midpoint(saved.get('target_radius', np.array([[0.0]]))).item(),
+    )
+
+
+def scalar_figure(case, x):
     fig, ax = plt.subplots(figsize=(8, 6.6))
-    limits = (-.02, .048) if raw is not None else ((-.044, .048) if case.name == 'corollary19' else (-.032, .048))
-    paper_axes(ax, limits, .01)
-    region = control_region(ax, case.intervals, 0, limits[1])
-    initial = ax.plot(x, state_values(case.initial, case.nx, 1, x), color=INITIAL, label=r'$y_0$')[0]
-    target = state_values(case.target, case.nx, 1, x)[:, 0]
-    target_line = ax.plot(x, target, color=TARGET, label=r'$y_f$')[0]
     spline = case.spline()
-    # Same continuous display norm for both tent witnesses, not equal maxima.
-    display_norm = .025/np.sqrt(3) if raw is not None else .29/np.sqrt(185)
-    factor = display_norm/natural_spline_norm(spline)
-    witness = ax.plot(x, factor*spline(x)[:, 0], color=REGULARIZED if raw else WITNESS,
-                      label=r'$p_f^{\mathrm{reg}}$' if raw else r'$p_f$')[0]
-    reference = ax.plot(x, maximal_control_response(case, x), color='black', label=r'$L_T\overline{u}$')[0]
-    metadata = {'witness_display_factor': factor, 'display_L2_norm': display_norm}
-    if raw is None:
-        handles = [initial, region, target_line, witness, reference]
-        ax.legend(handles=handles, loc='lower center', ncol=5,
-                  handlelength=1.8, columnspacing=1.35, handletextpad=.55)
-    else:
-        raw_spline = raw.spline()
-        raw_factor = display_norm/natural_spline_norm(raw_spline)
-        raw_line = ax.plot(x, raw_factor*raw_spline(x)[:, 0], color=WITNESS, label=r'$p_f$')[0]
-        # Matplotlib fills legend columns vertically, as in the original figure.
-        handles = [initial, region, target_line, raw_line, witness, reference]
-        ax.legend(handles=handles, loc='lower right', ncol=3, handlelength=1.8,
-                  columnspacing=1.3, handletextpad=.55)
-        metadata['raw_witness_display_factor'] = raw_factor
-        metadata['raw_snapshot_contains_certificate'] = False
-    fig.subplots_adjust(left=.10, right=.985, bottom=.07, top=.985)
-    return fig, metadata
+    display_norm = 0.29 / np.sqrt(185)
+    factor = display_norm / natural_spline_norm(spline)
+    witness = factor * spline(x)[:, 0]
+    target = state_values(case.target, case.nx, 1, x)[:, 0]
+    reference_level = 0.75 if case.name == 'heat_projected' else 1.0
+    reference = reference_level * maximal_control_response(case, x)
+    bottom = min(-0.032, float(witness.min()) - 0.005, float(target.min()) - 0.005)
+    top = max(0.048, float(witness.max()) + 0.005, float(reference.max()) + 0.005)
+    paper_axes(ax, (bottom, top), 0.01)
+    region = control_region(ax, case.intervals, 0, top)
+    initial = ax.plot(x, np.zeros_like(x), color=INITIAL, label=r'$y_0$')[0]
+    target_line = ax.plot(x, target, color=TARGET, label=r'$y_f$')[0]
+    witness_line = ax.plot(x, witness, color=WITNESS, label=r'$p_f$')[0]
+    reference_line = ax.plot(x, reference, color='black', linestyle=(0, (2, 2)),
+                             linewidth=0.9, label=r'$L_T\overline{u}$')[0]
+    ax.legend(handles=[initial, region, target_line, witness_line, reference_line],
+              loc='lower center', ncol=5, handlelength=1.8, columnspacing=1.35, handletextpad=0.55)
+    fig.subplots_adjust(left=0.10, right=0.985, bottom=0.07, top=0.985)
+    return fig, {'witness_display_factor': factor, 'display_L2_norm': display_norm,
+                 'reference_control_level': reference_level}
 
 
-def coupled_ball_figure(case, x):
-    """Figure 3: common scale and the notebook's enlarged uncontrolled state."""
-    fig, axes = plt.subplots(1, 2, sharey=True, figsize=(15, 6))
-    initial = state_values(case.initial, case.nx, 2, x)
+def endpoint_coefficients(time, profile, n_modes=2048):
+    """Floating reference endpoint for the coupled operator used in the article."""
+    frequency = np.pi * np.arange(1, n_modes + 1)
+    lam = frequency**2
+    alpha, beta = lam + 1, 1.5 * lam + 1
+    difference = lam / 4
+    delta = np.sqrt(difference**2 - 4)
+    tau = -(alpha + beta) / 2
+    slow, fast = np.exp(time * (tau + delta)), np.exp(time * (tau - delta))
+    e12 = (slow - fast) / delta
+    e22 = ((1 - difference / delta) * slow + (1 + difference / delta) * fast) / 2
+    forcing = sum(2 * level * (np.cos(frequency * a) - np.cos(frequency * b)) / frequency
+                  for a, b, level in profile)
+    return (forcing / (alpha * beta + 4))[:, None] * np.column_stack((
+        -beta * e12 - 2 * (e22 - 1), 2 * e12 - alpha * (e22 - 1)))
+
+
+def coupled_figure(case, x):
+    from matplotlib.ticker import FuncFormatter
+
+    if not (np.array_equal(case.kappa, [1, 1.5])
+            and np.array_equal(case.coupling, [[-1, 2], [-2, -1]])):
+        raise ValueError('The plotted coupled reference requires the paper model.')
     target = state_values(case.target, case.nx, 2, x)
     witness = case.spline()(x)
-    evolved = uncontrolled_final_state(case, x)
-    factor = 1/np.max(np.abs(witness))
-    evolution_factor = .72/np.max(np.abs(evolved))
-    for ax in axes:
-        paper_axes(ax, (-1.2, 1.4), .5)
-    left, right = axes
-    left.plot(x, initial[:, 0], color=INITIAL, label=r'$y_{01}$')
-    left.plot(x, target[:, 0], color=TARGET, label=r'$y_{f1}$')
-    left.plot(x, factor*witness[:, 0], color=WITNESS, label=r'$p_1$')
-    left.plot(x, evolution_factor*evolved[:, 0], color=REFERENCE, label=r'$(S_Ty_0)_1$')
-    control_region(right, case.intervals, -1, 1.4)
-    right.plot(x, factor*witness[:, 1], color=WITNESS, label=r'$p_2$')
-    right.plot(x, evolution_factor*evolved[:, 1], color=REFERENCE, label=r'$(S_Ty_0)_2$')
-    assert np.all(initial[:, 1] == target[:, 1])
-    right.plot(x, target[:, 1], color=TARGET, label=r'$y_{02}=y_{f2}$')
-    for ax in axes:
-        ax.legend(loc='upper center', ncol=4, handlelength=1.8, columnspacing=1.1, handletextpad=.5)
-    fig.subplots_adjust(left=.055, right=.99, bottom=.10, top=.98, wspace=.20)
-    return fig, {'witness_display_factor': factor, 'uncontrolled_state_display_factor': evolution_factor,
-                 'target_ball_radius': .01, 'target_ball_is_not_a_pointwise_band': True}
-
-
-def coupled_partial_figure(case, x):
-    """Same two-panel style; explicitly distinguish a free target from zero."""
+    factor = np.max(np.abs(target)) / np.max(np.abs(witness))
+    displayed = factor * witness
+    reference = None
+    if case.name != 'coupled_partial':
+        profile = [(0, 0.5, 1.8)] if case.name == 'coupled_ball' else [(0, 0.25, 1), (0.25, 0.5, -0.5)]
+        coefficients = endpoint_coefficients(case.time, profile)
+        reference = np.sin(np.pi * np.outer(x, np.arange(1, len(coefficients) + 1))) @ coefficients
+    visible = [target, displayed] + ([] if reference is None else [reference])
+    low = min(0, *(float(values.min()) for values in visible))
+    high = max(0, *(float(values.max()) for values in visible))
+    span = high - low
+    limits = (low - 0.12 * span, high + 0.29 * span)
+    wanted = (limits[1] - limits[0]) / 7
+    choices = np.array([1, 2, 5, 10]) * 10**np.floor(np.log10(wanted))
+    step = float(choices[np.argmin(np.abs(np.log(choices / wanted)))])
+    precision = max(0, int(-np.floor(np.log10(step))))
     fig, axes = plt.subplots(1, 2, sharey=True, figsize=(15, 6))
-    target = state_values(case.target, case.nx, 2, x)
-    witness = case.spline()(x)
-    assert np.all(witness[:, 1] == 0)
-    factor = .028/np.max(np.abs(witness))
-    for ax in axes:
-        paper_axes(ax, (-.035, .035), .01)
-    left, right = axes
-    left.plot(x, np.zeros_like(x), color=INITIAL, label=r'$y_{01}$')
-    left.plot(x, target[:, 0], color=TARGET, label=r'$y_1$')
-    left.plot(x, factor*witness[:, 0], color=WITNESS, label=r'$p_1$')
-    control_region(right, case.intervals, -.035, .035)
-    right.plot(x, witness[:, 1], color=WITNESS, label=r'$y_{02}=p_2=0$')
-    right.text(.70, .75, r'$\mathcal{Y}_{f,2}=L^2(0,1)$', transform=right.transAxes,
-               ha='center', va='center', fontsize=15)
-    for ax in axes:
-        ax.legend(loc='upper center', ncol=3, handlelength=1.8, columnspacing=1.2)
-    fig.subplots_adjust(left=.065, right=.99, bottom=.10, top=.98, wspace=.20)
-    return fig, {'witness_display_factor': factor, 'second_target_component': 'free'}
-
-
-def export(fig, name, metadata, output):
-    output.mkdir(parents=True, exist_ok=True)
-    fig.canvas.draw()
-    for extension in ('pdf', 'svg', 'png'):
-        fig.savefig(output / f'{name}.{extension}', dpi=220, bbox_inches='tight', pad_inches=.035)
-    plt.close(fig)
-    return {'case': name, **metadata}
-
-
-def write_captions(records, output):
-    """Keep article captions consistent with every regenerated display scale."""
-    captions = []
-    for record in records:
-        name = record['case']
-        factor = record['witness_display_factor']
-        if name.startswith('corollary'):
-            number = name.removeprefix('corollary')
-            text = (rf'Target, control domain and dual certificate for Corollary~{number}. '
-                    rf'The displayed certificate is ${factor:.6g}\,p_f$.')
-        elif name == 'proposition20':
-            raw_factor = record['raw_witness_display_factor']
-            text = (r'Target and dual witnesses for Proposition~20. '
-                    rf'The displayed curves are ${raw_factor:.6g}\,p_f$ and '
-                    rf'${factor:.6g}\,p_f^{{\mathrm{{reg}}}}$, with the same displayed $L^2$ norm. '
-                    r'The raw curve comes from a search snapshot; its fine-mesh verification is separate.')
-        elif name == 'proposition22':
-            state_factor = record['uncontrolled_state_display_factor']
-            text = (r'Initial state, target centre, control domain and dual certificate for Proposition~22. '
-                    rf'The displayed witness and uncontrolled final state are ${factor:.6g}\,p_f$ '
-                    rf'and ${state_factor:.6g}\,S_Ty_0$, respectively. '
-                    r'Each vector uses one factor for both components. '
-                    r'The target is an $L^2$ ball, not a pointwise band.')
+    for component, ax in enumerate(axes):
+        paper_axes(ax, limits, step)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, position: f'{value:.{precision}f}'))
+        ax.set_title('First component' if component == 0 else 'Second component', pad=12)
+        if component == 1:
+            control_region(ax, case.intervals, limits[0], limits[1])
+        ax.plot(x, np.zeros_like(x), color=INITIAL, label=rf'$y_{{0,{component+1}}}=0$')
+        if case.target_kind == 1 and component == 1:
+            ax.text(0.72, 0.72, r'$\mathcal{Y}_{f,2}=L^2(0,1)$', transform=ax.transAxes,
+                    ha='center', fontsize=15)
+            ax.text(0.72, 0.62, 'Free target component', transform=ax.transAxes, ha='center', fontsize=11)
         else:
-            text = (r'Prescribed first target component and dual certificate for Proposition~24. '
-                    rf'The displayed witness is ${factor:.6g}\,p_f$. '
-                    r'The second target component is free in $L^2(0,1)$, whereas $p_2=0$.')
-        captions.append('\n'.join((r'\begin{figure}[htbp]', r'  \centering',
-            rf'  \includegraphics[width=\linewidth]{{figures/{name}.pdf}}',
-            rf'  \caption{{{text}}}', rf'  \label{{fig:{name}}}', r'\end{figure}')))
-    (output/'captions.tex').write_text('\n\n'.join(captions)+'\n', encoding='utf-8')
+            label = rf'$y_{{f,{component+1}}}$'
+            if case.target_radius > 0:
+                label = 'Center ' + label
+            ax.plot(x, target[:, component], color=TARGET, label=label)
+        ax.plot(x, displayed[:, component], color=WITNESS,
+                linestyle='--' if np.all(displayed[:, component] == 0) else '-',
+                label=rf'$({factor:.3g})\,p_{{f,{component+1}}}$')
+        if reference is not None:
+            ax.plot(x, reference[:, component], color='black', linestyle=(0, (2, 2)),
+                    linewidth=0.9, label=r'$L_Tu_{\mathrm{ref}}$')
+        ax.legend(loc='upper center', ncol=2, handlelength=1.8, columnspacing=1.2, handletextpad=0.5)
+    fig.subplots_adjust(left=0.065, right=0.99, bottom=0.10, top=0.89, wspace=0.16)
+    return fig, {'witness_display_factor': factor, 'shared_component_scale': True,
+                 'target_ball_radius': case.target_radius,
+                 'free_second_component': case.target_kind == 1}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--project', type=Path, help='Read current MAT results from this paper-cap folder.')
-    parser.add_argument('--data-dir', type=Path, default=HERE/'data', help='Portable floating snapshots.')
-    parser.add_argument('--output', type=Path, default=HERE.parent/'results'/'figures')
+    parser.add_argument('--project', type=Path, required=True,
+                        help='Completed campaign code directory or repository with standalone results.')
+    parser.add_argument('--output', type=Path, help='Defaults to PROJECT/results/figures.')
     options = parser.parse_args()
-    names = (*CASE_NAMES, 'proposition20_unregularized')
-    use_snapshots = options.project is None and all((options.data_dir/f'{n}.npz').is_file() for n in names)
-    if use_snapshots:
-        cases = {n: read_snapshot(options.data_dir, n) for n in names}
-    else:
-        if options.project is None:
-            parser.error('No bundled snapshots found. Supply --project PATH to paper-cap.')
-        cases = {n: read_case(options.project, n) for n in names}
-        for case in cases.values():
-            save_snapshot(case, options.data_dir)
-    x = np.unique(np.r_[np.linspace(0, 1, 4001), .2, .4, .5, .8])
+    project = options.project.resolve()
+    output = options.output or project / 'results/figures'
+    # Load every input before writing any figure, so a missing result fails early.
+    cases = [read_case(project, name) for name in RESULT_FILES]
+    output.mkdir(parents=True, exist_ok=True)
     records = []
+    x = np.unique(np.r_[np.linspace(0, 1, 6001), 0.2, 0.25, 0.4, 0.5, 0.8])
     with plt.rc_context(STYLE):
-        # Corollary 18: y_0, y_f, omega, p_f and L_T u_bar.
-        fig, meta = scalar_figure(cases['corollary18'], x)
-        records.append(export(fig, 'corollary18', meta, options.output))
-
-        # Corollary 19: its own saved witness and T = 0.13 response.
-        fig, meta = scalar_figure(cases['corollary19'], x)
-        records.append(export(fig, 'corollary19', meta, options.output))
-
-        # Proposition 20: unregularized and regularized witnesses on one scale.
-        fig, meta = scalar_figure(cases['proposition20'], x, raw=cases['proposition20_unregularized'])
-        records.append(export(fig, 'proposition20', meta, options.output))
-
-        # Proposition 22: same two-panel presentation as Figure 3.
-        fig, meta = coupled_ball_figure(cases['proposition22'], x)
-        records.append(export(fig, 'proposition22', meta, options.output))
-
-        # Proposition 24: prescribed first target and free second component.
-        fig, meta = coupled_partial_figure(cases['proposition24'], x)
-        records.append(export(fig, 'proposition24', meta, options.output))
-
-    provenance = {
-        'figures': records, 'sources': {n: {'path': c.source, 'sha256': c.source_sha256,
-            'Nx': c.nx, 'Nt': c.nt, 'T': c.time} for n, c in cases.items()},
-        'notes': ['Floating illustrations only; no certification is run.',
-                  'Witness and uncontrolled-state display factors do not alter saved proof data.',
-                  'The raw tent snapshot contains search data; any fine-mesh verification is a separate computation.',
-                  'Short labels follow the original paper; display scaling is documented separately.'],
-    }
-    (options.output/'figure_metadata.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
-    write_captions(records, options.output)
-    print(f'Five figures exported as PDF, SVG and PNG to {options.output}')
-    for record in records:
-        print(record)
+        for number, case in enumerate(cases, 1):
+            figure, record = scalar_figure(case, x) if case.components == 1 else coupled_figure(case, x)
+            for extension in ('pdf', 'svg', 'png'):
+                figure.savefig(output / f'{case.name}.{extension}', dpi=220,
+                               bbox_inches='tight', pad_inches=0.035)
+            plt.close(figure)
+            record.update(figure=number, case=case.name, source=case.source,
+                          source_sha256=case.source_sha256, Nx=case.nx, Nt=case.nt, T=case.time,
+                          witness_representation='natural cubic spline', floating_illustration=True)
+            records.append(record)
+    (output / 'figure_metadata.json').write_text(json.dumps(records, indent=2), encoding='utf-8')
+    print(f'Seven figures generated from {project} in {output}')
 
 
 if __name__ == '__main__':
